@@ -31,6 +31,7 @@ GROUP_ITEMS = [
     {"name": "开启语音", "desc": "开始用语音回复我", "type": "command"},
     {"name": "关闭语音", "desc": "改回文字回复", "type": "command"},
     {"name": "切换", "desc": "换一个音色，不对就一直点", "type": "command"},
+    {"name": "点歌", "desc": "点歌+歌名搜网络歌曲", "type": "command"},
     {"name": "定时", "desc": "查看定时消息", "type": "command"},
     {"name": "状态", "desc": "查看版本与运行状态", "type": "command"},
     {"name": "签到", "desc": "每日签到攒积分，连签更多", "type": "command"},
@@ -48,6 +49,7 @@ C2C_ITEMS = [
     {"name": "开启语音", "desc": "开始用语音回复我", "type": "command"},
     {"name": "关闭语音", "desc": "改回文字回复", "type": "command"},
     {"name": "切换", "desc": "换一个音色，不对就一直点", "type": "command"},
+    {"name": "点歌", "desc": "点歌+歌名搜网络歌曲", "type": "command"},
     {"name": "定时", "desc": "查看定时消息", "type": "command"},
     {"name": "状态", "desc": "查看版本与运行状态", "type": "command"},
 ]

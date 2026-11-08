@@ -15,6 +15,7 @@ from botpy.message import C2CMessage, GroupMessage
 
 import config
 import groups
+import music
 import scheduler
 import tts
 from ai import AIClient
@@ -391,6 +392,7 @@ def menu_text() -> str:
         "   /摸摸 ······ 摸摸头互动\n"
         "   /表情包 ···· 随机搜一张表情包\n"
         "   /表情包 猫猫 ·· 按关键词搜图\n"
+        "   /点歌 歌名 ·· 搜索网络歌曲直接播放\n"
         + ("" if not config.ENABLE_GROUP_TOOLS else (
             "▸ 群互动\n"
             "   /昵称 名字 ··· 设置排行榜显示名\n"
@@ -707,6 +709,16 @@ class AIBotClient(botpy.Client):
             await self._send_image(message, args or "猫猫 表情包")
             return True
 
+        if cmd in ("点歌", "搜歌", "音乐", "歌曲", "music", "song"):
+            keyword = (args or "").strip()
+            if not keyword:
+                await message.reply(
+                    content="想听什么？发 /点歌 歌名，比如：/点歌 富士山下"
+                )
+                return True
+            await self._send_song(message, keyword)
+            return True
+
         if cmd in ("语音", "voice", "tts", "语音回复"):
             session_id = self._session_id(message)
             arg = (args or "").strip()
@@ -866,6 +878,43 @@ class AIBotClient(botpy.Client):
             except Exception as exc:  # noqa: BLE001 - 单张失败就换下一张
                 botpy.logger.warning(f"图片发送失败（{url}）：{exc}")
         await message.reply(content="图找到了但没发出去，等会儿再试试～")
+
+    async def _send_song(self, message, keyword: str):
+        """搜索网络歌曲并作为语音消息发送；失败时退回文字+试听链接。"""
+        try:
+            songs = music.search(keyword)
+        except Exception as exc:  # noqa: BLE001
+            botpy.logger.warning(f"歌曲搜索失败：{exc}")
+            await message.reply(content="歌曲搜索服务没连上，等会儿再试试～")
+            return
+        if not songs:
+            await message.reply(content=f"没找到「{keyword}」相关的歌，换个关键词试试。")
+            return
+        song = songs[0]
+        url = music.play_url(song["id"])
+        title = f"《{song['name']}》- {song['artist']}"
+        try:
+            if isinstance(message, GroupMessage):
+                uploaded = await self.api.post_group_file(
+                    group_openid=message.group_openid, file_type=3, url=url
+                )
+            else:
+                uploaded = await self.api.post_c2c_file(
+                    openid=message.author.user_openid, file_type=3, url=url
+                )
+            info = (uploaded or {}).get("file_info")
+            if not info:
+                raise RuntimeError(f"上传失败：{uploaded}")
+            await message.reply(content=f"🎵 {title}")
+            await message.reply(msg_type=7, media={"file_info": info})
+            botpy.logger.info(f"已发送歌曲：{title} <- {keyword}")
+        except Exception as exc:  # noqa: BLE001 - 发不出去就给链接
+            botpy.logger.warning(f"歌曲发送失败：{exc}")
+            others = [f"  · {s['name']} - {s['artist']}" for s in songs[1:4]]
+            text = f"找到了 {title}，但音频没发出去。\n直接听：{url}"
+            if others:
+                text += "\n其他结果：\n" + "\n".join(others)
+            await message.reply(content=text)
 
     async def _send_voice(self, message, text: str, session_id: str) -> bool:
         """合成语音并用官方富媒体接口发成 QQ 语音消息。失败返回 False。"""
