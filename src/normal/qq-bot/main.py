@@ -734,13 +734,33 @@ class AIBotClient(botpy.Client):
                 )
             return True
 
-        if cmd in ("停止语音", "关闭语音", "stopvoice"):
+        if cmd in ("开启语音", "语音开", "打开语音"):
+            tts.set_enabled(self._session_id(message), True)
+            await message.reply(
+                content=(
+                    f"语音回复已开启，当前音色：{tts.get_voice(self._session_id(message))}\n"
+                    "换音色直接点面板，或发 /音色 看全部。"
+                )
+            )
+            return True
+
+        if cmd in ("关闭语音", "停止语音", "语音关", "stopvoice"):
             tts.set_enabled(self._session_id(message), False)
             await message.reply(content="语音回复已关闭，恢复文字回复。")
             return True
 
         if cmd in ("音色", "声音", "声线", "voices"):
             await message.reply(content=tts.voice_list_text())
+            return True
+
+        # 面板里的「猫娘音色 / 幻想乡音色 …」：一句话切音色并开启
+        if cmd.endswith("音色") and cmd[:-2] in tts.VOICE_PRESETS:
+            session_id = self._session_id(message)
+            voice = tts.set_voice(session_id, cmd[:-2])
+            tts.set_enabled(session_id, True)
+            await message.reply(
+                content=f"音色已切换为「{voice}」，语音回复已开启。\n关闭：/关闭语音"
+            )
             return True
 
 
