@@ -148,6 +148,13 @@ def image_keyword(text: str) -> str:
 _IMAGE_RECENT: dict[str, list[str]] = {}
 _IMAGE_RECENT_MAX = 12
 
+# 点歌：机器人自己下载音频再上传（QQ 抓音乐链接会被拦），限制 10MB
+_MUSIC_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+)
+_MUSIC_MAX_BYTES = 10 * 1024 * 1024
+
 
 async def search_image_urls(keyword: str, limit: int = 10) -> list[str]:
     """用必应图片搜索找几张候选图，免费、不需要 Key。"""
@@ -879,6 +886,25 @@ class AIBotClient(botpy.Client):
                 botpy.logger.warning(f"图片发送失败（{url}）：{exc}")
         await message.reply(content="图找到了但没发出去，等会儿再试试～")
 
+    async def _download_audio(self, url: str) -> bytes:
+        """机器人自己下载音频（带浏览器 UA），返回 mp3 字节。
+        QQ 服务器抓音乐链接会被版权方拦，所以先下载再 base64 上传。"""
+        timeout = aiohttp.ClientTimeout(total=30)
+        headers = {"User-Agent": _MUSIC_UA, "Referer": "https://music.163.com/"}
+        async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    raise RuntimeError(f"HTTP {resp.status}")
+                data = await resp.content.read(_MUSIC_MAX_BYTES + 1)
+        if len(data) > _MUSIC_MAX_BYTES:
+            raise RuntimeError(f"文件太大（{_MUSIC_MAX_BYTES // 1024 // 1024}MB 上限）")
+        if len(data) < 10 * 1024:
+            raise RuntimeError("音频太小，可能是错误页")
+        # 有的源 Content-Type 乱标，直接看文件头（ID3 标签或 mp3 帧头）
+        if not (data[:3] == b"ID3" or data[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2")):
+            raise RuntimeError("下载到的不是音频")
+        return data
+
     async def _send_song(self, message, keyword: str):
         """多源搜索歌曲并作为语音消息发送；全部失败时退回文字。"""
         try:
@@ -892,21 +918,36 @@ class AIBotClient(botpy.Client):
             return
         for cand in cands:
             try:
+                audio = await self._download_audio(cand["url"])
+                payload = {
+                    "file_type": 3,
+                    "url": "",
+                    "file_data": base64.b64encode(audio).decode(),
+                    "srv_send_msg": False,
+                }
                 if isinstance(message, GroupMessage):
-                    uploaded = await self.api.post_group_file(
-                        group_openid=message.group_openid, file_type=3, url=cand["url"]
+                    route = Route(
+                        "POST",
+                        "/v2/groups/{group_openid}/files",
+                        group_openid=message.group_openid,
                     )
                 else:
-                    uploaded = await self.api.post_c2c_file(
-                        openid=message.author.user_openid, file_type=3, url=cand["url"]
+                    route = Route(
+                        "POST",
+                        "/v2/users/{openid}/files",
+                        openid=message.author.user_openid,
                     )
+                uploaded = await self.api._http.request(route, json=payload)
                 info = (uploaded or {}).get("file_info")
                 if not info:
                     raise RuntimeError(f"上传失败：{uploaded}")
+                # 先发语音，成功后再发歌名，避免出现"只有名字没有语音"
+                await message.reply(msg_type=7, media={"file_info": info})
                 tag = "（试听音质）" if cand["source"] == "qq" else ""
                 await message.reply(content=f"🎵 {cand['title']}{tag}")
-                await message.reply(msg_type=7, media={"file_info": info})
-                botpy.logger.info(f"已发送歌曲：{cand['title']} [{cand['source']}] <- {keyword}")
+                botpy.logger.info(
+                    f"已发送歌曲：{cand['title']} [{cand['source']}] {len(audio)} 字节 <- {keyword}"
+                )
                 return
             except Exception as exc:  # noqa: BLE001 - 这个源不行就换下一个
                 botpy.logger.warning(f"歌曲源 {cand['source']} 失败：{exc}")
