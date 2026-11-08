@@ -753,8 +753,8 @@ class AIBotClient(botpy.Client):
             await message.reply(content=tts.voice_list_text())
             return True
 
-        # 面板里的「猫娘音色 / 幻想乡音色 …」：一句话切音色并开启
-        if cmd.endswith("音色") and cmd[:-2] in tts.VOICE_PRESETS:
+        # 面板里的「油库里音色 / 猫娘音色 …」：一句话切音色并开启
+        if cmd.endswith("音色") and tts.resolve_voice(cmd[:-2]):
             session_id = self._session_id(message)
             voice = tts.set_voice(session_id, cmd[:-2])
             tts.set_enabled(session_id, True)

@@ -25,7 +25,7 @@ VOICE_PRESETS: dict[str, dict[str, str]] = {
     "猫娘": {"voice": "zh-CN-XiaoyiNeural", "rate": "+8%", "pitch": "+30Hz", "desc": "软软的小猫娘"},
     "少女": {"voice": "zh-CN-XiaoyiNeural", "rate": "+2%", "pitch": "+14Hz", "desc": "清亮的少女音"},
     "御姐": {"voice": "zh-CN-XiaoxiaoNeural", "rate": "-6%", "pitch": "-14Hz", "desc": "低沉的御姐音"},
-    "幻想乡": {"voice": "zh-CN-XiaoxiaoNeural", "rate": "-10%", "pitch": "+24Hz", "desc": "轻声细语的幻想乡口音"},
+    "幻想乡": {"voice": "zh-CN-XiaoyiNeural", "rate": "-6%", "pitch": "+70Hz", "desc": "油库里那种高音软萌"},
     "元气": {"voice": "zh-CN-XiaoyiNeural", "rate": "+16%", "pitch": "+8Hz", "desc": "元气满满的群友"},
     "正太": {"voice": "zh-CN-YunxiaNeural", "rate": "+6%", "pitch": "+22Hz", "desc": "软糯的正太音"},
     "少年": {"voice": "zh-CN-YunxiNeural", "rate": "0%", "pitch": "+6Hz", "desc": "干净的少年音"},
@@ -36,6 +36,7 @@ VOICE_PRESETS: dict[str, dict[str, str]] = {
 ALIASES = {
     "猫": "猫娘", "猫猫": "猫娘", "喵": "猫娘", "mao": "猫娘", "neko": "猫娘",
     "二次元": "幻想乡", "幻想": "幻想乡", "乡": "幻想乡", "gensokyo": "幻想乡",
+    "油库里": "幻想乡", "油库": "幻想乡", "ゆっくり": "幻想乡", "yukkuri": "幻想乡", "馒头": "幻想乡",
     "姐姐": "御姐", "女王": "御姐", "萝莉": "少女", "萌": "少女",
     "热血": "元气", "男": "少年", "大叔": "旁白",
 }
@@ -100,13 +101,16 @@ def set_voice(session_id: str, name: str) -> str:
     return voice
 
 
-def normalize_voice(name: str) -> str:
+def resolve_voice(name: str) -> str | None:
+    """把音色名或别名解析成预设名，认不出返回 None。"""
     name = (name or "").strip()
     if name in VOICE_PRESETS:
         return name
-    if name.lower() in ALIASES:
-        return ALIASES[name.lower()]
-    return DEFAULT_VOICE
+    return ALIASES.get(name.lower())
+
+
+def normalize_voice(name: str) -> str:
+    return resolve_voice(name) or DEFAULT_VOICE
 
 
 def voice_list_text() -> str:
