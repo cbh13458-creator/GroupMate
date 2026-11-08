@@ -753,6 +753,22 @@ class AIBotClient(botpy.Client):
             await message.reply(content=tts.voice_list_text())
             return True
 
+        # 「切换」：循环换到下一个音色，声音不对就一直点
+        if cmd in ("切换", "换一个", "下一个", "换音色", "切换音色", "next"):
+            session_id = self._session_id(message)
+            voice = tts.next_voice(session_id)
+            tts.set_enabled(session_id, True)
+            preset = tts.VOICE_PRESETS[voice]
+            names = list(tts.VOICE_PRESETS)
+            idx = names.index(voice) + 1
+            await message.reply(
+                content=(
+                    f"已切换到「{voice}」（{idx}/{len(names)}）：{preset['desc']}\n"
+                    "不满意再点「切换」，或发 /切换 继续换；关闭：/关闭语音"
+                )
+            )
+            return True
+
         # 面板里的「油库里音色 / 猫娘音色 …」：一句话切音色并开启
         if cmd.endswith("音色") and tts.resolve_voice(cmd[:-2]):
             session_id = self._session_id(message)

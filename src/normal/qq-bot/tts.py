@@ -113,6 +113,17 @@ def normalize_voice(name: str) -> str:
     return resolve_voice(name) or DEFAULT_VOICE
 
 
+def next_voice(session_id: str) -> str:
+    """切换到音色列表里的下一个（循环），用于「声音不对就一直点」。"""
+    names = list(VOICE_PRESETS)
+    current = get_voice(session_id)
+    try:
+        idx = names.index(current)
+    except ValueError:
+        idx = 0
+    return set_voice(session_id, names[(idx + 1) % len(names)])
+
+
 def voice_list_text() -> str:
     lines = ["可用音色："]
     for name, preset in VOICE_PRESETS.items():
