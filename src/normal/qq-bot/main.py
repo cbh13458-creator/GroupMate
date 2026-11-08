@@ -958,6 +958,9 @@ class AIBotClient(botpy.Client):
     async def _deliver_song(self, message, song: dict):
         """把选中的歌发出去：先试直链上传，不行再 base64，每个源都试一遍。"""
         title, last_err = song["title"], ""
+        # 《晴天》- 周杰伦 -> 晴天 - 周杰伦.mp3，作为文件名带给 QQ
+        file_name = title.replace("《", "").replace("》", " ") .strip() + ".mp3"
+        file_name = file_name.replace("/", "-")
         for cand in song["sources"]:
             try:
                 audio, final_url = await self._download_audio(cand["url"])
@@ -965,15 +968,19 @@ class AIBotClient(botpy.Client):
                 last_err = str(exc)
                 continue
             payloads = [
-                # 直链上传：无 302，QQ 能抓到就是完整文件
+                # 带文件名 + 直链：QQ 支持 file_name 时文件名正确
+                {"file_type": 4, "url": final_url, "srv_send_msg": False,
+                 "file_name": file_name},
+                # 纯直链：QQ 按 URL 取名（可能是哈希名，但带 .mp3 后缀）
                 {"file_type": 4, "url": final_url, "srv_send_msg": False},
-                # base64 兜底
-                {
-                    "file_type": 4,
-                    "url": "",
-                    "file_data": base64.b64encode(audio).decode(),
-                    "srv_send_msg": False,
-                },
+                # 带文件名 + base64 兜底
+                {"file_type": 4, "url": "",
+                 "file_data": base64.b64encode(audio).decode(),
+                 "srv_send_msg": False, "file_name": file_name},
+                # 纯 base64 兜底（最可能变成「未命名」，放最后）
+                {"file_type": 4, "url": "",
+                 "file_data": base64.b64encode(audio).decode(),
+                 "srv_send_msg": False},
             ]
             for payload in payloads:
                 try:
