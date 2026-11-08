@@ -15,7 +15,6 @@ from botpy.message import C2CMessage, GroupMessage
 
 import config
 import groups
-import music
 import scheduler
 import tts
 from ai import AIClient
@@ -147,17 +146,6 @@ def image_keyword(text: str) -> str:
 # 每个关键词最近发过的图，避免一直发同一张
 _IMAGE_RECENT: dict[str, list[str]] = {}
 _IMAGE_RECENT_MAX = 12
-
-# 点歌：机器人自己下载音频再上传（QQ 抓音乐链接会被拦），限制 10MB
-_MUSIC_UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
-)
-_MUSIC_MAX_BYTES = 10 * 1024 * 1024
-
-# 点歌选歌：session_id -> {"songs": [...], "ts": ...}，90 秒内回复序号有效
-_PENDING_SONGS: dict[str, dict] = {}
-_PENDING_TTL = 90
 
 
 async def search_image_urls(keyword: str, limit: int = 10) -> list[str]:
@@ -403,7 +391,6 @@ def menu_text() -> str:
         "   /摸摸 ······ 摸摸头互动\n"
         "   /表情包 ···· 随机搜一张表情包\n"
         "   /表情包 猫猫 ·· 按关键词搜图\n"
-        "   /点歌 歌名 ·· 搜索网络歌曲直接播放\n"
         + ("" if not config.ENABLE_GROUP_TOOLS else (
             "▸ 群互动\n"
             "   /昵称 名字 ··· 设置排行榜显示名\n"
@@ -720,16 +707,6 @@ class AIBotClient(botpy.Client):
             await self._send_image(message, args or "猫猫 表情包")
             return True
 
-        if cmd in ("点歌", "搜歌", "音乐", "歌曲", "music", "song"):
-            keyword = (args or "").strip()
-            if not keyword:
-                await message.reply(
-                    content="想听什么？发 /点歌 歌名，比如：/点歌 富士山下"
-                )
-                return True
-            await self._send_song(message, keyword)
-            return True
-
         if cmd in ("语音", "voice", "tts", "语音回复"):
             session_id = self._session_id(message)
             arg = (args or "").strip()
@@ -890,131 +867,6 @@ class AIBotClient(botpy.Client):
                 botpy.logger.warning(f"图片发送失败（{url}）：{exc}")
         await message.reply(content="图找到了但没发出去，等会儿再试试～")
 
-    async def _download_audio(self, url: str):
-        """机器人自己下载音频（带浏览器 UA），返回 (mp3 字节, 最终直链)。
-        QQ 服务器抓音乐链接会被版权方拦，所以先下载再传；最终直链可用于
-        URL 方式上传（无 302 跳转，QQ 抓取成功率更高）。"""
-        timeout = aiohttp.ClientTimeout(total=30)
-        headers = {"User-Agent": _MUSIC_UA, "Referer": "https://music.163.com/"}
-        async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
-            async with session.get(url) as resp:
-                if resp.status != 200:
-                    raise RuntimeError(f"HTTP {resp.status}")
-                final_url = str(resp.url)
-                data = await resp.content.read(_MUSIC_MAX_BYTES + 1)
-        if len(data) > _MUSIC_MAX_BYTES:
-            raise RuntimeError(f"文件太大（{_MUSIC_MAX_BYTES // 1024 // 1024}MB 上限）")
-        if len(data) < 10 * 1024:
-            raise RuntimeError("音频太小，可能是错误页")
-        # 有的源 Content-Type 乱标，直接看文件头（ID3 标签或 mp3 帧头）
-        if not (data[:3] == b"ID3" or data[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2")):
-            raise RuntimeError("下载到的不是音频")
-        return data, final_url
-
-    async def _send_song(self, message, keyword: str):
-        """搜歌并出编号列表，用户回复序号后再发歌。"""
-        try:
-            cands = music.candidates(keyword)
-        except Exception as exc:  # noqa: BLE001
-            botpy.logger.warning(f"歌曲搜索失败：{exc}")
-            await message.reply(content="歌曲搜索服务没连上，等会儿再试试～")
-            return
-        if not cands:
-            await message.reply(content=f"没找到「{keyword}」相关的歌，换个关键词试试。")
-            return
-        # 同一首歌的多个源合并，列表里一首歌只出现一次
-        by_title: dict[str, list] = {}
-        for cand in cands:
-            by_title.setdefault(cand["title"], []).append(cand)
-        songs = [{"title": t, "sources": s} for t, s in list(by_title.items())[:5]]
-        _PENDING_SONGS[self._session_id(message)] = {"songs": songs, "ts": time.time()}
-        lines = ["🎵 找到这些，回复序号点歌（90 秒内）："]
-        for i, song in enumerate(songs, 1):
-            tag = "（试听音质）" if song["sources"][0]["source"] == "qq" else ""
-            lines.append(f"{i}. {song['title']}{tag}")
-        lines.append("群里回复记得 @我，例如：@我 1")
-        await message.reply(content="\n".join(lines))
-
-    async def _handle_song_pick(self, message, text: str) -> bool:
-        """回复序号发歌。返回 True 表示已处理。"""
-        pick = (text or "").strip().lstrip("/")
-        if not pick.isdigit():
-            return False
-        session_id = self._session_id(message)
-        pending = _PENDING_SONGS.get(session_id)
-        if not pending:
-            return False
-        if time.time() - pending["ts"] > _PENDING_TTL:
-            del _PENDING_SONGS[session_id]
-            return False
-        idx = int(pick) - 1
-        songs = pending["songs"]
-        if not 0 <= idx < len(songs):
-            return False
-        del _PENDING_SONGS[session_id]
-        await self._deliver_song(message, songs[idx])
-        return True
-
-    async def _deliver_song(self, message, song: dict):
-        """把选中的歌发出去：先试直链上传，不行再 base64，每个源都试一遍。"""
-        title, last_err = song["title"], ""
-        # 《晴天》- 周杰伦 -> 晴天 - 周杰伦.mp3，作为文件名带给 QQ
-        file_name = title.replace("《", "").replace("》", " ") .strip() + ".mp3"
-        file_name = file_name.replace("/", "-")
-        for cand in song["sources"]:
-            try:
-                audio, final_url = await self._download_audio(cand["url"])
-            except Exception as exc:  # noqa: BLE001
-                last_err = str(exc)
-                continue
-            payloads = [
-                # 带文件名 + 直链：QQ 支持 file_name 时文件名正确
-                {"file_type": 4, "url": final_url, "srv_send_msg": False,
-                 "file_name": file_name},
-                # 纯直链：QQ 按 URL 取名（可能是哈希名，但带 .mp3 后缀）
-                {"file_type": 4, "url": final_url, "srv_send_msg": False},
-                # 带文件名 + base64 兜底
-                {"file_type": 4, "url": "",
-                 "file_data": base64.b64encode(audio).decode(),
-                 "srv_send_msg": False, "file_name": file_name},
-                # 纯 base64 兜底（最可能变成「未命名」，放最后）
-                {"file_type": 4, "url": "",
-                 "file_data": base64.b64encode(audio).decode(),
-                 "srv_send_msg": False},
-            ]
-            for payload in payloads:
-                try:
-                    if isinstance(message, GroupMessage):
-                        route = Route(
-                            "POST",
-                            "/v2/groups/{group_openid}/files",
-                            group_openid=message.group_openid,
-                        )
-                    else:
-                        route = Route(
-                            "POST",
-                            "/v2/users/{openid}/files",
-                            openid=message.author.user_openid,
-                        )
-                    uploaded = await self.api._http.request(route, json=payload)
-                    info = (uploaded or {}).get("file_info")
-                    if not info:
-                        raise RuntimeError(f"上传失败：{uploaded}")
-                    # 先发文件，成功后再发歌名
-                    await message.reply(msg_type=7, media={"file_info": info})
-                    tag = "（试听音质）" if cand["source"] == "qq" else ""
-                    await message.reply(content=f"🎵 {title}{tag}")
-                    botpy.logger.info(
-                        f"已发送歌曲：{title} [{cand['source']}] {len(audio)} 字节"
-                    )
-                    return
-                except Exception as exc:  # noqa: BLE001 - 换种方式/下个源再试
-                    last_err = str(exc)
-                    botpy.logger.warning(f"歌曲源 {cand['source']} 失败：{exc}")
-        await message.reply(
-            content=f"{title} 发不出去（{last_err[:40]}），换一首试试～"
-        )
-
     async def _send_voice(self, message, text: str, session_id: str) -> bool:
         """合成语音并用官方富媒体接口发成 QQ 语音消息。失败返回 False。"""
         if not (config.ENABLE_TTS and text and text.strip()):
@@ -1076,10 +928,6 @@ class AIBotClient(botpy.Client):
                     botpy.logger.warning(f"群互动统计失败：{exc}")
         else:
             scheduler.record_target("c2c", message.author.user_openid)
-
-        # 点歌选歌：回复序号（在斜杠指令之前拦截纯数字）
-        if await self._handle_song_pick(message, text):
-            return
 
         # 斜杠指令：/菜单 /摸摸 /表情包 /定时 /状态
         if await self._handle_slash(message, text):
