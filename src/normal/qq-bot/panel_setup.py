@@ -95,13 +95,18 @@ def get_token():
 
 
 def _merge(existing, wanted):
+    """面板以代码里的定义为准：缺的补上、多余的删掉，保证和 GROUP_ITEMS 一致。"""
     names = {item.get("name") for item in existing if isinstance(item, dict)}
     added = 0
     for item in wanted:
         if item["name"] not in names:
             existing.append(dict(item))
             added += 1
-    return added
+    wanted_names = {item["name"] for item in wanted}
+    removed = len(existing)
+    existing[:] = [i for i in existing if i.get("name") in wanted_names]
+    removed -= len(existing)
+    return added, removed
 
 
 def _sync_scope(api, token, scope, wanted, check_only=False):
@@ -119,10 +124,10 @@ def _sync_scope(api, token, scope, wanted, check_only=False):
     if panels:
         for rec in panels:
             items = rec["panel"].get("items") or []
-            added = _merge(items, wanted)
+            added, removed = _merge(items, wanted)
             body = {"panel": {"items": items, "remark": rec["panel"].get("remark") or REMARK}}
             api("/v2/panels/" + rec["panel_id"], token, "PUT", body)
-            print("%s 面板已同步：新增 %d 项，共 %d 项" % (scope, added, len(items)))
+            print("%s 面板已同步：新增 %d 项、删除 %d 项，共 %d 项" % (scope, added, removed, len(items)))
         return
 
     body = {"scope": scope, "target_type": "all",
