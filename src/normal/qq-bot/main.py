@@ -920,7 +920,8 @@ class AIBotClient(botpy.Client):
             try:
                 audio = await self._download_audio(cand["url"])
                 payload = {
-                    "file_type": 3,
+                    # 整首歌走「文件」通道：语音接口对长 mp3 会截成 1 秒
+                    "file_type": 4,
                     "url": "",
                     "file_data": base64.b64encode(audio).decode(),
                     "srv_send_msg": False,
