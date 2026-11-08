@@ -11,7 +11,10 @@ import json
 import os
 import re
 
-import edge_tts
+try:  # 没装 edge-tts 时不要让整个机器人起不来，语音退回文字即可
+    import edge_tts
+except ImportError:  # pragma: no cover
+    edge_tts = None
 
 import config
 
@@ -150,6 +153,8 @@ async def synth(text: str, voice_name: str) -> bytes:
     content = clean_for_tts(text)
     if not content:
         raise ValueError("没有可合成的内容")
+    if edge_tts is None:
+        raise RuntimeError("未安装 edge-tts（pip install edge-tts）")
     preset = VOICE_PRESETS[normalize_voice(voice_name)]
     proxy = config.TTS_PROXY or os.getenv("HTTPS_PROXY") or os.getenv("https_proxy") or None
     communicate = edge_tts.Communicate(
