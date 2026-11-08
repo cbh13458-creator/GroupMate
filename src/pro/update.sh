@@ -58,7 +58,7 @@ SRC="$TMP/x/$EDITION"
 BACKUP="$DIR/backup/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$BACKUP"
 echo "备份现有程序文件到 $BACKUP ..."
-for rel in qq-bot/ai.py qq-bot/config.py qq-bot/main.py qq-bot/groups.py qq-bot/scheduler.py qq-bot/panel.py qq-bot/requirements.txt bot.sh setup.sh boot-start.sh update.sh watchdog.sh health-check.sh activate.sh README.md VERSION; do
+for rel in qq-bot/ai.py qq-bot/config.py qq-bot/main.py qq-bot/tts.py qq-bot/groups.py qq-bot/scheduler.py qq-bot/panel.py qq-bot/requirements.txt bot.sh setup.sh boot-start.sh update.sh watchdog.sh health-check.sh activate.sh README.md VERSION; do
   if [ -f "$DIR/$rel" ]; then
     mkdir -p "$BACKUP/$(dirname "$rel")"
     cp -p "$DIR/$rel" "$BACKUP/$rel"

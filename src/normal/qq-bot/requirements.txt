@@ -3,3 +3,4 @@ aiohttp
 httpx
 python-dotenv
 Pillow
+edge-tts>=6.1.9

@@ -68,6 +68,16 @@ PANEL_PORT = int(os.getenv("PANEL_PORT", "8080"))
 # 面板登录密码：留空时仅允许本机(127.0.0.1)访问；一旦 PANEL_HOST=0.0.0.0 必须设置密码，否则面板拒绝启动
 PANEL_PASSWORD = os.getenv("PANEL_PASSWORD", "")
 
+# ============ 语音回复 ============
+# 语音总开关（关掉后 /语音 指令不再生效）
+ENABLE_TTS = os.getenv("ENABLE_TTS", "true").lower() in ("1", "true", "yes", "on")
+# 单条语音最多合成多少字（太长会慢，也可能超过 QQ 语音时长限制）
+TTS_MAX_CHARS = int(os.getenv("TTS_MAX_CHARS", "120"))
+# 合成超时（秒）
+TTS_TIMEOUT = int(os.getenv("TTS_TIMEOUT", "20"))
+# 可选：单独给 TTS 用的代理（留空则跟随 HTTPS_PROXY）
+TTS_PROXY = os.getenv("TTS_PROXY", "")
+
 # ============ 记忆与限额 ============
 # 每个会话保留的历史消息条数（一问一答算 2 条）
 AI_MEMORY_MESSAGES = int(os.getenv("AI_MEMORY_MESSAGES", "20"))

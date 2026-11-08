@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import os
 import random
@@ -9,11 +10,13 @@ from html import unescape
 import aiohttp
 import botpy
 from botpy.connection import ConnectionState
+from botpy.http import Route
 from botpy.message import C2CMessage, GroupMessage
 
 import config
 import groups
 import scheduler
+import tts
 from ai import AIClient
 
 # botpy 内部用 aiohttp 发请求。aiohttp 默认不读系统代理（trust_env=False），
@@ -382,6 +385,8 @@ def menu_text() -> str:
         "   @我 + 说话 ·· 闲聊 / 问答 / 联网搜索\n"
         "   @我 + 引用消息 ·· 能看到被引用的内容\n"
         "   /忘记 ······ 清空当前会话记忆\n"
+        "   /语音 ······ 语音回复开关（/语音 开、/语音 关）\n"
+        "   /音色 ······ 换音色（猫娘/少女/御姐/幻想乡…）\n"
         "▸ 娱乐\n"
         "   /摸摸 ······ 摸摸头互动\n"
         "   /表情包 ···· 随机搜一张表情包\n"
@@ -702,6 +707,43 @@ class AIBotClient(botpy.Client):
             await self._send_image(message, args or "猫猫 表情包")
             return True
 
+        if cmd in ("语音", "voice", "tts", "语音回复"):
+            session_id = self._session_id(message)
+            arg = (args or "").strip()
+            if not config.ENABLE_TTS:
+                await message.reply(content="语音功能被管理员关掉了（.env 里 ENABLE_TTS=false）。")
+                return True
+            if arg in ("开", "开启", "打开", "on", "start"):
+                tts.set_enabled(session_id, True)
+                await message.reply(
+                    content=(
+                        f"语音回复已开启，当前音色：{tts.get_voice(session_id)}\n"
+                        "换音色：/语音 幻想乡　看全部：/音色　关闭：/语音 关"
+                    )
+                )
+            elif arg in ("关", "关闭", "停止", "停", "off", "stop"):
+                tts.set_enabled(session_id, False)
+                await message.reply(content="语音回复已关闭，恢复文字回复。")
+            elif arg in ("", "状态", "status"):
+                await message.reply(content=tts.status_text(session_id))
+            else:
+                voice = tts.set_voice(session_id, arg)
+                tts.set_enabled(session_id, True)
+                await message.reply(
+                    content=f"音色已切换为「{voice}」，并已开启语音回复。\n看全部音色：/音色"
+                )
+            return True
+
+        if cmd in ("停止语音", "关闭语音", "stopvoice"):
+            tts.set_enabled(self._session_id(message), False)
+            await message.reply(content="语音回复已关闭，恢复文字回复。")
+            return True
+
+        if cmd in ("音色", "声音", "声线", "voices"):
+            await message.reply(content=tts.voice_list_text())
+            return True
+
+
         if cmd in ("定时", "定时消息", "sched"):
             tasks = scheduler.load_tasks()
             if not tasks:
@@ -789,6 +831,47 @@ class AIBotClient(botpy.Client):
                 botpy.logger.warning(f"图片发送失败（{url}）：{exc}")
         await message.reply(content="图找到了但没发出去，等会儿再试试～")
 
+    async def _send_voice(self, message, text: str, session_id: str) -> bool:
+        """合成语音并用官方富媒体接口发成 QQ 语音消息。失败返回 False。"""
+        if not (config.ENABLE_TTS and text and text.strip()):
+            return False
+        voice = tts.get_voice(session_id)
+        try:
+            audio = await tts.synth(text, voice)
+        except Exception as exc:  # noqa: BLE001 - 合成失败就退回文字
+            botpy.logger.warning(f"语音合成失败：{exc}")
+            return False
+        try:
+            payload = {
+                "file_type": 3,
+                "url": "",
+                "file_data": base64.b64encode(audio).decode(),
+                "srv_send_msg": False,
+            }
+            if isinstance(message, GroupMessage):
+                route = Route(
+                    "POST",
+                    "/v2/groups/{group_openid}/files",
+                    group_openid=message.group_openid,
+                )
+            else:
+                route = Route(
+                    "POST",
+                    "/v2/users/{openid}/files",
+                    openid=message.author.user_openid,
+                )
+            uploaded = await self.api._http.request(route, json=payload)
+            info = (uploaded or {}).get("file_info")
+            if not info:
+                botpy.logger.warning(f"语音上传失败：{uploaded}")
+                return False
+            await message.reply(msg_type=7, media={"file_info": info})
+            botpy.logger.info(f"已发送语音：{voice}，{len(audio)} 字节 -> {text[:20]}…")
+            return True
+        except Exception as exc:  # noqa: BLE001 - 单条失败不影响文字兜底
+            botpy.logger.warning(f"语音发送失败：{exc}")
+            return False
+
     async def _handle(self, message):
         text = clean_content(message.content)
         media = get_media(message)
@@ -874,6 +957,10 @@ class AIBotClient(botpy.Client):
 
         if self._is_repeat_reply(session_id, reply_text):
             botpy.logger.info("重复回复已抑制（90 秒内同一句）")
+            return
+
+        if tts.enabled(session_id) and await self._send_voice(message, reply_text, session_id):
+            self._remember_reply(session_id, reply_text)
             return
 
         await message.reply(content=reply_text)
