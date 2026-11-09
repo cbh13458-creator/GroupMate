@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GroupMate 管理面板 · 预览</title>
+<style>
+:root{
+  --bg:#0b0d17; --panel:rgba(23,26,44,.78); --line:rgba(126,138,214,.16);
+  --text:#e8eaf6; --muted:#8b90a8; --accent:#6a7dff; --accent2:#4fd1c5;
+  --ok:#35d07f; --warn:#ffc857; --bad:#ff5c6c; --radius:16px;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;padding:0 16px 48px;min-height:100vh;color:var(--text);
+  font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:
+    radial-gradient(1100px 520px at 12% -6%, rgba(90,104,255,.22), transparent 60%),
+    radial-gradient(900px 460px at 92% 8%, rgba(79,209,197,.14), transparent 55%),
+    radial-gradient(800px 500px at 50% 108%, rgba(139,92,246,.16), transparent 60%),
+    var(--bg);
+  background-attachment:fixed;
+}
+.wrap{max-width:1080px;margin:0 auto}
+.preview-note{
+  max-width:1080px;margin:16px auto 0;padding:10px 14px;border-radius:12px;
+  border:1px dashed rgba(255,200,87,.45);background:rgba(255,200,87,.08);
+  color:#ffd98a;font-size:12.5px;line-height:1.6;display:flex;align-items:center;gap:9px;
+}
+.preview-note b{color:#ffe4ad}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:22px 0 14px}
+.brand{font-size:21px;font-weight:800;letter-spacing:.4px;display:flex;align-items:baseline;gap:10px}
+.brand i{font-style:normal;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.ver{font-size:12px;color:var(--muted);font-weight:500}
+.pills{display:flex;gap:8px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:999px;font-size:12.5px;
+  background:rgba(30,34,56,.8);border:1px solid var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;background:#5b6079;transition:.3s}
+.dot.on{background:var(--ok);box-shadow:0 0 10px rgba(53,208,127,.7)}
+.dot.off{background:var(--bad);box-shadow:0 0 10px rgba(255,92,108,.6)}
+nav{display:flex;gap:6px;overflow-x:auto;padding:6px;margin-bottom:18px;border-radius:14px;
+  background:rgba(20,23,40,.72);border:1px solid var(--line);backdrop-filter:blur(12px);
+  position:sticky;top:8px;z-index:9}
+nav button{flex:0 0 auto;border:0;background:transparent;color:var(--muted);padding:9px 16px;border-radius:10px;
+  font-size:13.5px;font-weight:600;cursor:pointer;transition:.18s;white-space:nowrap}
+nav button:hover{color:var(--text);background:rgba(255,255,255,.04)}
+nav button.on{color:#fff;background:linear-gradient(135deg,rgba(106,125,255,.95),rgba(139,92,246,.9));
+  box-shadow:0 6px 18px rgba(106,92,255,.32)}
+.tab{display:none;animation:fade .25s ease}
+.tab.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px;margin-bottom:16px}
+.card{position:relative;overflow:hidden;padding:16px;border-radius:var(--radius);
+  background:linear-gradient(160deg,rgba(34,38,64,.92),rgba(20,23,40,.92));
+  border:1px solid var(--line);transition:.2s}
+.card:hover{transform:translateY(-2px);border-color:rgba(126,138,214,.34);box-shadow:0 14px 32px rgba(0,0,0,.32)}
+.card .label{font-size:12px;color:var(--muted);margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.card .value{font-size:21px;font-weight:750;letter-spacing:.3px}
+.card .value.small{font-size:15px;font-weight:600;word-break:break-all}
+.card .sub{font-size:11.5px;color:var(--muted);margin-top:6px}
+.card.hero::after{content:'';position:absolute;inset:-40% -20% auto auto;width:120px;height:120px;border-radius:50%;
+  background:radial-gradient(circle,rgba(106,125,255,.35),transparent 70%)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px;margin-bottom:16px;backdrop-filter:blur(12px)}
+section h2{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+section .desc{font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.6}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.row.tight{gap:6px}
+button{cursor:pointer;border:1px solid rgba(126,138,214,.22);background:rgba(32,36,60,.9);color:var(--text);
+  border-radius:11px;padding:9px 15px;font-size:13.5px;font-weight:600;transition:.18s}
+button:hover{background:rgba(46,52,86,.95);border-color:rgba(126,138,214,.45);transform:translateY(-1px)}
+button:active{transform:none}
+button.primary{background:linear-gradient(135deg,#6a5cff,#8b5cf6);border:0;box-shadow:0 8px 20px rgba(106,92,255,.3)}
+button.primary:hover{box-shadow:0 10px 26px rgba(106,92,255,.45)}
+button.ghost{background:transparent}
+button.danger{background:rgba(58,29,40,.9);border-color:rgba(107,43,61,.7);color:#ffb3c0}
+button.small{padding:6px 11px;font-size:12px;border-radius:9px}
+label.field{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted);flex:1 1 190px}
+label.field.wide{flex:1 1 100%}
+input,select,textarea{background:rgba(12,15,28,.9);border:1px solid rgba(126,138,214,.2);color:var(--text);
+  border-radius:11px;padding:10px 12px;font-size:13.5px;outline:none;transition:.18s;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(106,125,255,.14)}
+textarea{width:100%;min-height:150px;resize:vertical;line-height:1.65;font-size:13px}
+textarea.log{min-height:300px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;
+  color:#c2c8e4;background:#080a14;white-space:pre}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;
+  border-radius:12px;background:rgba(14,17,32,.6);border:1px solid var(--line)}
+.switch .t{font-size:13px}
+.switch .d{font-size:11.5px;color:var(--muted);margin-top:3px}
+.toggle{position:relative;width:46px;height:26px;border-radius:999px;background:#2c3150;transition:.22s;flex:0 0 auto;border:0;padding:0}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+  background:#8b90a8;transition:.22s}
+.toggle.on{background:linear-gradient(135deg,#6a5cff,#8b5cf6)}
+.toggle.on::after{left:23px;background:#fff}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid rgba(126,138,214,.12);vertical-align:middle}
+th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px}
+tr:hover td{background:rgba(255,255,255,.015)}
+.tag{font-size:11.5px;padding:2px 9px;border-radius:7px;background:rgba(44,49,80,.9);color:#aab0c8}
+.tag.on{background:rgba(22,53,31,.9);color:#6fe39a}
+.tag.off{background:rgba(58,29,40,.9);color:#ff9db0}
+.hint{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.7}
+.voices{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.voice{padding:12px;border-radius:13px;background:rgba(18,21,38,.85);border:1px solid var(--line);transition:.18s}
+.voice:hover{border-color:rgba(126,138,214,.4);transform:translateY(-1px)}
+.voice.playing{border-color:rgba(79,209,197,.65);box-shadow:0 0 0 3px rgba(79,209,197,.1)}
+.voice .n{font-size:14px;font-weight:700;margin-bottom:3px}
+.voice .d{font-size:11px;color:var(--muted);min-height:28px;line-height:1.5}
+.voice button{width:100%;margin-top:8px}
+.playbar{display:flex;align-items:center;gap:10px;margin-top:14px;padding:10px 12px;border-radius:12px;
+  background:rgba(14,17,32,.7);border:1px solid var(--line)}
+.playbar .pb{width:34px;height:34px;border-radius:50%;border:0;padding:0;display:grid;place-items:center;
+  background:linear-gradient(135deg,#6a5cff,#8b5cf6);font-size:12px;flex:0 0 auto}
+.playbar .bar{flex:1;height:6px;border-radius:99px;background:rgba(126,138,214,.18);overflow:hidden}
+.playbar .fill{height:100%;width:0;background:linear-gradient(90deg,#6a7dff,#4fd1c5);transition:width .2s linear}
+.playbar .time{font-size:11.5px;color:var(--muted);min-width:64px;text-align:right;font-variant-numeric:tabular-nums}
+#toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,12px);background:rgba(38,44,74,.96);
+  border:1px solid rgba(126,138,214,.3);padding:11px 20px;border-radius:12px;font-size:13.5px;
+  opacity:0;transition:.25s;pointer-events:none;z-index:50;max-width:86vw;text-align:center;
+  box-shadow:0 14px 40px rgba(0,0,0,.45)}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+.empty{padding:22px;text-align:center;color:var(--muted);font-size:12.5px}
+#group-box,#mem-box,#sched-box,#gname-box{overflow-x:auto}
+#group-box table,#mem-box table,#sched-box table,#gname-box table{min-width:560px}
+@media(max-width:520px){
+  header{padding:16px 0 10px}
+  .brand{font-size:18px}
+  section{padding:15px}
+  .card .value{font-size:19px}
+  .preview-note{font-size:11.5px}
+}
+</style>
+</head>
+<body>
+<div class="preview-note">
+  <span><b>预览模式</b> · 本页面所有数据均为演示效果，不会连接机器人、不会修改任何配置；按钮点击只在页面内模拟。</span>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="brand">Group<i>Mate</i><span class="ver">v1.4.1</span></div>
+    <div class="pills">
+      <div class="pill"><span class="dot on"></span><span>QQ 在线</span></div>
+      <div class="pill"><span class="dot on"></span><span>微信在线</span></div>
+      <div class="pill"><span class="dot on"></span><span>守护中</span></div>
+    </div>
+  </header>
+
+  <nav>
+    <button class="on" onclick="tab('home',this)">概览</button>
+    <button onclick="tab('chat',this)">聊天</button>
+    <button onclick="tab('voice',this)">语音</button>
+    <button onclick="tab('group',this)">群数据</button>
+    <button onclick="tab('sched',this)">定时</button>
+    <button onclick="tab('system',this)">系统</button>
+  </nav>
+
+  <!-- 概览 -->
+  <div class="tab on" id="tab-home">
+    <div class="grid">
+      <div class="card hero"><div class="label">QQ 机器人</div><div class="value">运行中</div><div class="sub">已运行 2 天 7 小时</div></div>
+      <div class="card"><div class="label">微信龙虾</div><div class="value">运行中</div><div class="sub">已运行 6 小时 12 分</div></div>
+      <div class="card"><div class="label">当前版本</div><div class="value small">v1.4.1</div><div class="sub">普通版</div></div>
+      <div class="card"><div class="label">运行模型</div><div class="value small">glm-4.7-flash</div><div class="sub">可在「聊天」里更换</div></div>
+      <div class="card"><div class="label">已知群 / 定时任务</div><div class="value small">3 个群 · 4 条</div><div class="sub">群需要先 @ 机器人一次</div></div>
+      <div class="card"><div class="label">会话记忆</div><div class="value small">7 个会话 · 128 条</div><div class="sub">可在「群数据」里清空</div></div>
+    </div>
+
+    <section>
+      <h2>快捷操作</h2>
+      <p class="desc">启动、停止、重启与更新。操作会调用 ~/bot.sh，执行需要几秒。</p>
+      <div class="row">
+        <button class="primary" onclick="mock('一键启动')">一键启动</button>
+        <button onclick="mock('只启动 QQ')">只启动 QQ</button>
+        <button onclick="mock('只启动微信')">只启动微信</button>
+        <button onclick="mock('重启 QQ')">重启 QQ</button>
+        <button class="danger" onclick="mock('停止全部')">停止全部</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button onclick="mock('开启断线守护')">开启断线守护</button>
+        <button onclick="mock('关闭断线守护')">关闭断线守护</button>
+        <button onclick="mock('同步 QQ 指令面板')">同步 QQ 指令面板</button>
+        <button onclick="mock('检查更新')">检查更新</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- 聊天 -->
+  <div class="tab" id="tab-chat">
+    <section>
+      <h2>模型与接口</h2>
+      <p class="desc">改完保存后需要重启机器人才生效。</p>
+      <div class="row">
+        <label class="field">模型<input type="text" value="glm-4.7-flash"></label>
+        <label class="field">接口地址<input type="text" value="https://open.bigmodel.cn/api/paas/v4"></label>
+        <label class="field">API Key<input type="text" value="••••••••••••••••••••••••"></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="field">温度 (0~1)<input type="number" step="0.1" value="0.8"></label>
+        <label class="field">最大输出 token<input type="number" value="2048"></label>
+        <label class="field">记忆条数<input type="number" value="20"></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="field">每人每分钟次数<input type="number" value="8"></label>
+        <label class="field">每人每天次数<input type="number" value="300"></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>人格设定</h2>
+      <p class="desc">决定它说话的语气。写得越具体，越像你想要的性格。</p>
+      <textarea>你是 GroupMate，群里的真人朋友，不是客服，也不是百科。
+说话口语化、简短，像 QQ 上随手打字；不要长篇大论，不要列条条框框。
+群友问什么就聊什么，接得住梗但别硬玩梗，不确定的事就直说不知道。
+偶尔可以用「嗯」「哈哈」「草」这种语气词，但别每句都用。</textarea>
+    </section>
+
+    <section>
+      <h2>功能开关</h2>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:0">
+        <div class="switch"><div><div class="t">联网搜索</div><div class="d">回答前先搜一下网上内容</div></div>
+          <button class="toggle on" onclick="flip(this)"></button></div>
+        <div class="switch"><div><div class="t">表情包 / 找图</div><div class="d">支持「来个表情包」</div></div>
+          <button class="toggle on" onclick="flip(this)"></button></div>
+        <div class="switch"><div><div class="t">群互动工具</div><div class="d">签到、排行榜、词云</div></div>
+          <button class="toggle on" onclick="flip(this)"></button></div>
+        <div class="switch"><div><div class="t">摸摸头</div><div class="d">「摸摸 / 贴贴」随机回应</div></div>
+          <button class="toggle on" onclick="flip(this)"></button></div>
+        <div class="switch"><div><div class="t">文字分条</div><div class="d">长回复拆成多条，更像真人</div></div>
+          <button class="toggle on" onclick="flip(this)"></button></div>
+        <div class="switch"><div><div class="t">菜单指令</div><div class="d">支持「菜单 / 帮助」</div></div>
+          <button class="toggle on" onclick="flip(this)"></button></div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <label class="field">最多拆几条<input type="number" value="3"></label>
+        <label class="field">最短间隔(秒)<input type="number" step="0.1" value="0.8"></label>
+        <label class="field">最长间隔(秒)<input type="number" step="0.1" value="2.2"></label>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="primary" onclick="mock('保存配置')">保存配置</button>
+        <button onclick="mock('重新读取配置')">重新读取</button>
+        <button onclick="mock('保存并重启')">保存并重启</button>
+      </div>
+      <div class="hint">留空的项目不会被修改；这里只会改动 .env 里的常用项，其它内容原样保留。</div>
+    </section>
+  </div>
+
+  <!-- 语音 -->
+  <div class="tab" id="tab-voice">
+    <section>
+      <h2>语音回复</h2>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:0">
+        <div class="switch"><div><div class="t">语音总开关</div><div class="d">关闭后所有回复都用文字</div></div>
+          <button class="toggle on" onclick="flip(this)"></button></div>
+        <div class="switch"><div><div class="t">语音也分条</div><div class="d">一条回复拆成几条短语音</div></div>
+          <button class="toggle on" onclick="flip(this)"></button></div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <label class="field">每条语音最多字数<input type="number" value="60"></label>
+        <label class="field">最多几条<input type="number" value="3"></label>
+        <label class="field">合成上限字数<input type="number" value="120"></label>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="primary" onclick="mock('保存语音设置')">保存语音设置</button>
+        <button onclick="mock('保存并重启')">保存并重启</button>
+      </div>
+      <div class="hint">语音走 edge-tts（微软在线合成），需要网络；合成失败会自动退回文字。</div>
+    </section>
+
+    <section>
+      <h2>音色试听</h2>
+      <p class="desc">点「试听」直接在这里听效果，不用去群里发消息。群里发 <b>/切换</b> 可以逐个换。</p>
+      <div class="row" style="margin-bottom:12px">
+        <label class="field wide">试听文本
+          <input type="text" value="你好呀，我是群里的朋友，今天也一起玩吧。" id="preview-text">
+        </label>
+      </div>
+      <div class="voices" id="voice-grid"></div>
+      <div class="playbar">
+        <button class="pb" onclick="playFake()">▶</button>
+        <div class="bar"><div class="fill" id="pfill"></div></div>
+        <span class="time" id="ptime">00:00 / 00:04</span>
+      </div>
+      <div class="hint" id="playing-note">当前：未播放（预览模式下为模拟播放，实际面板会直接播放合成的语音）</div>
+    </section>
+  </div>
+
+  <!-- 群数据 -->
+  <div class="tab" id="tab-group">
+    <section>
+      <h2>群互动数据</h2>
+      <p class="desc">群友在群里 @机器人 发「签到」即可参与，数据存在 groupstats.json。</p>
+      <div id="group-box"></div>
+    </section>
+
+    <section>
+      <h2>群名称备注</h2>
+      <p class="desc">QQ 不向普通机器人提供群名，这里只是面板和定时任务里的显示名。</p>
+      <div id="gname-box"></div>
+    </section>
+
+    <section>
+      <h2>会话记忆</h2>
+      <p class="desc">每个群成员一份独立记忆，存在 memory.json。清空后它就忘了之前的聊天。</p>
+      <div id="mem-box"></div>
+      <div class="row" style="margin-top:12px">
+        <button onclick="mock('刷新记忆列表')">刷新</button>
+        <button class="danger" onclick="clearAllMemory()">清空全部记忆</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- 定时 -->
+  <div class="tab" id="tab-sched">
+    <section>
+      <h2>定时消息（QQ 专属）</h2>
+      <p class="desc">每天固定时间自动往群里发一句话。QQ 主动消息受官方配额限制，超限会发送失败。</p>
+      <div id="sched-box"></div>
+      <div class="row" style="margin-top:14px">
+        <label class="field" style="flex:0 1 150px">时间 HH:MM<input type="text" id="f-time" placeholder="08:00"></label>
+        <label class="field">发送内容<input type="text" id="f-text" placeholder="早上好，今天也要加油"></label>
+        <label class="field" style="flex:0 1 200px">目标<select id="f-scope"></select></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" onclick="addTask()">添加任务</button>
+        <button onclick="mock('刷新定时任务')">刷新</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- 系统 -->
+  <div class="tab" id="tab-system">
+    <section>
+      <h2>运行日志</h2>
+      <div class="row" style="margin-bottom:10px">
+        <label class="field" style="flex:0 1 170px">来源
+          <select id="log-which" onchange="renderLog()">
+            <option value="qq">QQ 机器人</option>
+            <option value="oc">微信龙虾</option>
+            <option value="panel">面板</option>
+          </select>
+        </label>
+        <label class="field">过滤关键词<input type="text" id="log-filter" placeholder="例如 错误 / 语音" oninput="renderLog()"></label>
+        <label class="field" style="flex:0 0 auto;justify-content:flex-end">
+          <span>&nbsp;</span>
+          <button onclick="mock('刷新日志')">刷新</button>
+        </label>
+      </div>
+      <textarea class="log" id="log-box" readonly></textarea>
+      <div class="row" style="margin-top:10px">
+        <button onclick="autoLog(this)" id="btn-auto">自动刷新：关</button>
+        <button onclick="document.getElementById('log-box').scrollTop=999999">滚到底部</button>
+      </div>
+      <div class="hint">日志保存于 ~/qq-bot.log，最多显示最近 200 行。</div>
+    </section>
+
+    <section>
+      <h2>版本与更新</h2>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:0">
+        <div class="card"><div class="label">当前版本</div><div class="value small">v1.4.1</div></div>
+        <div class="card"><div class="label">版本类型</div><div class="value small">普通版</div></div>
+        <div class="card"><div class="label">更新检查</div><div class="value small">每 6 小时</div><div class="sub">可在 .env 调整</div></div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="primary" onclick="mock('检查并更新到最新版')">检查并更新</button>
+        <button onclick="mock('同步 QQ 面板')">同步 QQ 面板</button>
+      </div>
+      <div class="hint">更新从 GitHub 拉取发布包，网络不通时会失败；失败不影响正在运行的版本。</div>
+    </section>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+/* ================= 演示数据 ================= */
+const VOICES = [
+  {name:'猫娘',   desc:'软软的小猫娘'},
+  {name:'少女',   desc:'清亮的少女音'},
+  {name:'御姐',   desc:'低沉的御姐音'},
+  {name:'幻想乡', desc:'油库里那种高音软萌'},
+  {name:'元气',   desc:'元气满满的群友'},
+  {name:'正太',   desc:'软糯的正太音'},
+  {name:'少年',   desc:'干净的少年音'},
+  {name:'旁白',   desc:'讲故事的大叔音'}
+];
+
+const GROUPS = {
+  'group:821994': {name:'摸鱼小分队',   seen:'2026-11-09 12:31'},
+  'group:550213': {name:'深夜代码局',   seen:'2026-11-09 11:58'},
+  'group:736118': {name:'二次元同好会', seen:'2026-11-09 12:20'}
+};
+
+const STATS = [
+  {group:'821994', name:'摸鱼小分队',   members:18, messages:1342, checked_today:9,
+   top:[{name:'小明',points:180},{name:'阿橘',points:150},{name:'团子',points:120}]},
+  {group:'550213', name:'深夜代码局',   members:12, messages:876,  checked_today:5,
+   top:[{name:'星野',points:210},{name:'KK',points:95}]},
+  {group:'736118', name:'二次元同好会', members:27, messages:2043, checked_today:14,
+   top:[{name:'油库里',points:320},{name:'miku',points:260},{name:'猫猫',points:190}]}
+];
+
+let MEMORY = [
+  {id:'group:821994:u1001', count:20, last:'那今晚八点开黑？'},
+  {id:'group:821994:u1002', count:18, last:'哈哈哈哈这也太离谱了'},
+  {id:'group:821994:u1003', count:9,  last:'签到签到，今天第一个'},
+  {id:'group:550213:u2001', count:12, last:'帮我看下这个报错'},
+  {id:'group:736118:u3001', count:6,  last:'来点猫娘音'},
+  {id:'group:736118:u3002', count:14, last:'这首歌你听过吗'},
+  {id:'c2c:9A2B3C4D',       count:20, last:'晚安，明天聊'}
+];
+
+let TASKS = [
+  {id:'a1b2c3d4', time:'08:00', text:'早上好，今天也要加油',        scope:'all',              enabled:true},
+  {id:'e5f6a7b8', time:'12:30', text:'记得吃饭，别一直坐着',        scope:'group:821994',     enabled:true},
+  {id:'c9d0e1f2', time:'18:00', text:'周五晚八点开黑，报名的扣 1',  scope:'group:550213',     enabled:false},
+  {id:'a3b4c5d6', time:'23:00', text:'早点睡，明天见',              scope:'all',              enabled:true}
+];
+
+const LOGS = {
+  qq: [
+    '[12:34:02] [INFO] 启动 GroupMate v1.4.1',
+    '[12:34:03] [INFO] 已加载 3 个群、4 条定时任务',
+    '[12:34:04] [INFO] 连接 QQ 网关成功，等待事件',
+    '[12:35:10] [群 821994] 收到 @ 消息：今天吃什么',
+    '[12:35:11] [AI] 请求 glm-4.7-flash，输入 412 tokens',
+    '[12:35:12] [人味模式] 拆分为 2 条消息，间隔 1.2s',
+    '[12:35:14] [TTS] 合成语音 zh-CN-XiaoyiNeural（猫娘）',
+    '[12:35:16] [发送] 语音消息发送成功（2.8s）',
+    '[12:36:40] [群 736118] 收到 @ 消息：来点幻想乡',
+    '[12:36:41] [切换] 音色 猫娘 -> 幻想乡',
+    '[12:36:43] [TTS] 合成语音 zh-CN-XiaoyiNeural（幻想乡）',
+    '[12:36:44] [发送] 语音消息发送成功（3.1s）',
+    '[12:38:02] [签到] 821994 / u1003 签到成功 +10，连签 3 天',
+    '[12:39:15] [定时] 无到期任务',
+    '[12:40:00] [INFO] 心跳正常，延迟 42ms'
+  ],
+  oc: [
+    '[12:30:00] [INFO] 微信龙虾已启动',
+    '[12:30:02] [INFO] 已连接网关，等待消息',
+    '[12:33:20] [消息] 收到私聊消息，转交 AI',
+    '[12:33:22] [AI] glm-4.7-flash 返回 218 tokens',
+    '[12:33:23] [发送] 回复成功',
+    '[12:40:00] [INFO] 心跳正常，延迟 65ms'
+  ],
+  panel: [
+    '[12:34:02] [INFO] 管理面板启动 http://127.0.0.1:8080',
+    '[12:35:01] [访问] 127.0.0.1 GET /api/status 200',
+    '[12:35:02] [访问] 127.0.0.1 GET /api/config 200',
+    '[12:35:04] [访问] 127.0.0.1 GET /api/voices 200',
+    '[12:36:10] [访问] 127.0.0.1 POST /api/action 200',
+    '[12:38:30] [访问] 127.0.0.1 GET /api/logs 200'
+  ]
+};
+
+/* ================= 基础交互 ================= */
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function mock(name){
+  toast('预览模式：这里会执行「' + name + '」，实际面板会调用机器人');
+}
+function flip(el){ el.classList.toggle('on'); }
+function tab(name, el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  $('tab-' + name).classList.add('on');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+}
+function esc(s){
+  return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ================= 语音试听（模拟） ================= */
+let playingTimer = null, playingCard = null;
+function renderVoices(){
+  $('voice-grid').innerHTML = VOICES.map((v,i)=>
+    '<div class="voice" id="vc-'+i+'"><div class="n">'+esc(v.name)+'</div><div class="d">'+esc(v.desc)+'</div>'+
+    '<button class="small" onclick="preview('+i+')">试听</button></div>'
+  ).join('');
+}
+function preview(i){
+  const v = VOICES[i];
+  if(playingCard) playingCard.classList.remove('playing');
+  playingCard = $('vc-' + i);
+  playingCard.classList.add('playing');
+  $('playing-note').textContent = '当前：' + v.name + '（预览模式下为模拟播放，实际面板会直接播放合成的语音）';
+  toast('预览模式：实际会合成「' + v.name + '」并播放');
+  playFake();
+}
+function playFake(){
+  clearInterval(playingTimer);
+  const fill = $('pfill'), time = $('ptime');
+  let p = 0;
+  fill.style.width = '0%';
+  playingTimer = setInterval(()=>{
+    p += 2;
+    fill.style.width = Math.min(p,100) + '%';
+    const sec = Math.min(4, Math.round(p / 25));
+    time.textContent = '00:0' + sec + ' / 00:04';
+    if(p >= 100){ clearInterval(playingTimer); playingTimer = null; }
+  }, 80);
+}
+
+/* ================= 群数据 ================= */
+function renderGroupStats(){
+  let h = '<table><tr><th>群</th><th>成员</th><th>消息</th><th>今日签到</th><th>积分前三</th></tr>';
+  for(const g of STATS){
+    const top = (g.top||[]).map(t=>t.name + ' ' + t.points).join('、') || '—';
+    h += '<tr><td>'+esc(g.name)+'（'+g.group+'）</td><td>'+g.members+'</td><td>'+g.messages+'</td>'+
+         '<td>'+g.checked_today+'</td><td>'+esc(top)+'</td></tr>';
+  }
+  h += '</table>';
+  $('group-box').innerHTML = h;
+}
+function renderGroupNames(){
+  const gids = Object.keys(GROUPS);
+  let h = '<table><tr><th>群</th><th>显示名称</th><th></th></tr>';
+  gids.forEach((gid,i)=>{
+    h += '<tr><td>'+gid.slice(-6)+'</td><td><input type="text" id="gn-'+i+'" value="'+esc(GROUPS[gid].name)+'" placeholder="给这个群起个名字"></td>'+
+         '<td><button class="small" onclick="renameGroup('+i+')">保存</button></td></tr>';
+  });
+  h += '</table>';
+  $('gname-box').innerHTML = h;
+}
+function renameGroup(i){
+  const gid = Object.keys(GROUPS)[i];
+  GROUPS[gid].name = $('gn-' + i).value.trim();
+  toast('预览模式：已保存群名「' + (GROUPS[gid].name || '未命名') + '」');
+  renderGroupStats(); renderSched();
+}
+function renderMemory(){
+  if(!MEMORY.length){
+    $('mem-box').innerHTML = '<div class="empty">还没有聊天记忆。</div>';
+    return;
+  }
+  let h = '<table><tr><th>会话</th><th>条数</th><th>最近一句</th><th></th></tr>';
+  MEMORY.forEach((s,i)=>{
+    const parts = s.id.split(':');
+    const kind = parts[0] === 'group' ? '群聊' : '私聊';
+    let short;
+    if(parts[0] === 'group'){
+      const g = GROUPS['group:' + parts[1]];
+      short = (g && g.name) || ('群 ' + (parts[1]||'').slice(-6));
+    }else{
+      short = '私聊 ' + (parts[1]||'').slice(-6);
+    }
+    h += '<tr><td>'+esc(kind + ' · ' + short)+'</td><td>'+s.count+'</td><td>'+esc(s.last||'—')+'</td>'+
+         '<td><button class="small danger" onclick="clearMemory('+i+')">清空</button></td></tr>';
+  });
+  h += '</table>';
+  $('mem-box').innerHTML = h;
+}
+function clearMemory(i){
+  if(!confirm('清空这个会话的记忆？（预览模式）')) return;
+  const name = MEMORY[i].id;
+  MEMORY.splice(i,1);
+  toast('预览模式：已清空 ' + name);
+  renderMemory();
+}
+function clearAllMemory(){
+  if(!confirm('确定清空全部会话记忆？（预览模式）')) return;
+  MEMORY = [];
+  toast('预览模式：已清空全部会话记忆');
+  renderMemory();
+}
+
+/* ================= 定时任务 ================= */
+function groupLabel(gid){
+  const g = GROUPS['group:' + gid];
+  return g ? (g.name + '（' + gid.slice(-6) + '）') : ('群 ' + gid.slice(-6));
+}
+function scopeLabel(scope){
+  if(scope === 'all') return '所有群(' + Object.keys(GROUPS).length + ')';
+  if(scope.indexOf('group:') === 0) return groupLabel(scope.slice(6));
+  return scope;
+}
+function renderSched(){
+  let h = '';
+  if(!TASKS.length){
+    h = '<div class="empty">还没有定时任务</div>';
+  }else{
+    h = '<table><tr><th>时间</th><th>内容</th><th>目标</th><th>状态</th><th></th></tr>';
+    for(const t of TASKS){
+      h += '<tr><td><b>'+esc(t.time)+'</b></td><td>'+esc(t.text)+'</td><td>'+esc(scopeLabel(t.scope))+'</td>'+
+           '<td><span class="tag '+(t.enabled?'on':'off')+'">'+(t.enabled?'启用':'暂停')+'</span></td>'+
+           '<td><button class="small" onclick="toggleTask(\''+t.id+'\')">'+(t.enabled?'暂停':'恢复')+'</button> '+
+           '<button class="small danger" onclick="delTask(\''+t.id+'\')">删除</button></td></tr>';
+    }
+    h += '</table>';
+  }
+  $('sched-box').innerHTML = h;
+
+  let opts = '<option value="all">所有已知群</option>';
+  for(const gid of Object.keys(GROUPS)){
+    opts += '<option value="'+gid+'">'+esc(GROUPS[gid].name)+'（'+gid.slice(-6)+'）</option>';
+  }
+  $('f-scope').innerHTML = opts;
+}
+function addTask(){
+  const time = $('f-time').value.trim();
+  const text = $('f-text').value.trim();
+  const scope = $('f-scope').value;
+  if(!time || !text){ toast('请填写时间和内容'); return; }
+  if(!/^\d{1,2}:\d{2}$/.test(time)){ toast('时间格式应为 HH:MM，例如 08:00'); return; }
+  TASKS.push({id:'n' + Date.now(), time, text, scope, enabled:true});
+  $('f-text').value = '';
+  toast('预览模式：已添加每天 ' + time + ' 的任务');
+  renderSched();
+}
+function delTask(id){
+  if(!confirm('删除这条定时任务？（预览模式）')) return;
+  TASKS = TASKS.filter(t=>t.id !== id);
+  toast('预览模式：已删除');
+  renderSched();
+}
+function toggleTask(id){
+  const t = TASKS.find(x=>x.id === id);
+  if(t){ t.enabled = !t.enabled; renderSched(); toast('预览模式：已' + (t.enabled?'恢复':'暂停')); }
+}
+
+/* ================= 日志 ================= */
+let LOGTIMER = null;
+function renderLog(){
+  const src = $('log-which').value;
+  const kw = $('log-filter').value.trim().toLowerCase();
+  const lines = LOGS[src] || [];
+  const shown = kw ? lines.filter(l=>l.toLowerCase().indexOf(kw) >= 0) : lines;
+  $('log-box').value = shown.join('\n') || '（没有匹配的日志）';
+}
+function autoLog(btn){
+  if(LOGTIMER){
+    clearInterval(LOGTIMER); LOGTIMER = null;
+    btn.textContent = '自动刷新：关'; btn.classList.remove('primary');
+    return;
+  }
+  LOGTIMER = setInterval(()=>{
+    const src = $('log-which').value;
+    LOGS[src].push('[' + new Date().toTimeString().slice(0,8) + '] [INFO] 预览模式：模拟心跳，延迟 ' + (35 + Math.floor(Math.random()*30)) + 'ms');
+    if(LOGS[src].length > 200) LOGS[src].shift();
+    renderLog();
+    const box = $('log-box');
+    box.scrollTop = box.scrollHeight;
+  }, 3000);
+  btn.textContent = '自动刷新：开'; btn.classList.add('primary');
+}
+
+/* ================= 初始化 ================= */
+renderVoices();
+renderGroupStats();
+renderGroupNames();
+renderMemory();
+renderSched();
+renderLog();
+</script>
+</body>
+</html>
