@@ -31,6 +31,12 @@ HUMAN_SPLIT_MIN_LEN = int(os.getenv("HUMAN_SPLIT_MIN_LEN", "28"))
 # 每条消息发出前的随机延迟区间（秒），模拟看消息 + 打字的停顿
 HUMAN_DELAY_MIN = float(os.getenv("HUMAN_DELAY_MIN", "0.4"))
 HUMAN_DELAY_MAX = float(os.getenv("HUMAN_DELAY_MAX", "1.2"))
+# 语音模式也分条：一条语音别念太久，拆成几条短语音发出去
+HUMAN_VOICE_SPLIT = os.getenv("HUMAN_VOICE_SPLIT", "true").lower() in ("1", "true", "yes", "on")
+# 每条语音最多念多少字
+HUMAN_VOICE_PART_MAX = int(os.getenv("HUMAN_VOICE_PART_MAX", "38"))
+# 一条回复最多拆成几条语音
+HUMAN_VOICE_MAX_PARTS = int(os.getenv("HUMAN_VOICE_MAX_PARTS", "3"))
 
 # 联网搜索（默认开启）
 AI_WEB_SEARCH = os.getenv("AI_WEB_SEARCH", "true").lower() in ("1", "true", "yes", "on")

@@ -913,6 +913,44 @@ class AIBotClient(botpy.Client):
                 botpy.logger.warning(f"图片发送失败（{url}）：{exc}")
         await message.reply(content="图找到了但没发出去，等会儿再试试～")
 
+    def _voice_parts(self, text: str) -> list[str]:
+        """把回复切成适合念的短语音段：按句攒，每段不超过 HUMAN_VOICE_PART_MAX 字。"""
+        text = (text or "").strip()
+        if not text:
+            return []
+        if not config.HUMAN_VOICE_SPLIT:
+            return [text]
+
+        limit = max(10, config.HUMAN_VOICE_PART_MAX)
+        if len(text) <= limit:
+            return [text]
+
+        sentences = [s.strip() for s in re.split(r"(?<=[。！？!?…~～\n])", text) if s.strip()]
+        parts: list[str] = []
+        buf = ""
+        for s in sentences:
+            # 单句就超长：硬切
+            while len(s) > limit:
+                if buf:
+                    parts.append(buf)
+                    buf = ""
+                parts.append(s[:limit])
+                s = s[limit:]
+            if not buf:
+                buf = s
+            elif len(buf) + len(s) <= limit:
+                buf += s
+            else:
+                parts.append(buf)
+                buf = s
+        if buf:
+            parts.append(buf)
+
+        max_parts = max(1, config.HUMAN_VOICE_MAX_PARTS)
+        if len(parts) > max_parts:
+            parts = parts[: max_parts - 1] + ["".join(parts[max_parts - 1 :])]
+        return parts
+
     async def _send_voice(self, message, text: str, session_id: str) -> bool:
         """合成语音并用官方富媒体接口发成 QQ 语音消息。失败返回 False。"""
         if not (config.ENABLE_TTS and text and text.strip()):
@@ -1041,9 +1079,20 @@ class AIBotClient(botpy.Client):
             botpy.logger.info("重复回复已抑制（90 秒内同一句）")
             return
 
-        if tts.enabled(session_id) and await self._send_voice(message, reply_text, session_id):
-            self._remember_reply(session_id, reply_text)
-            return
+        if tts.enabled(session_id):
+            parts = self._voice_parts(reply_text)
+            sent = 0
+            for idx, part in enumerate(parts):
+                if idx:
+                    await asyncio.sleep(
+                        random.uniform(config.HUMAN_DELAY_MIN, config.HUMAN_DELAY_MAX) + 0.3
+                    )
+                if not await self._send_voice(message, part, session_id):
+                    break
+                sent += 1
+            if sent:
+                self._remember_reply(session_id, reply_text)
+                return
 
         await self._human_send(message, reply_text)
         self._remember_reply(session_id, reply_text)
