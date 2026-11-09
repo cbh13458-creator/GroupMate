@@ -565,7 +565,11 @@ class AIBotClient(botpy.Client):
         return chunks
 
     async def _human_send(self, message, text: str) -> None:
-        """按人味模式发出回复：分条 + 随机延迟。失败退回单条发送。"""
+        """按人味模式发出回复：分条 + 随机延迟。失败退回单条发送。
+
+        QQ 对同一条消息的多次被动回复要求 msg_seq 递增，否则会报
+        「消息被去重，请检查请求msgseq」，所以每条都要带自己的序号。
+        """
         parts = self._split_human(text)
         if not parts:
             return
@@ -573,7 +577,7 @@ class AIBotClient(botpy.Client):
             f"人味模式：HUMAN_MODE={config.HUMAN_MODE} 原文 {len(text)} 字 -> {len(parts)} 条"
         )
         if len(parts) == 1:
-            await message.reply(content=parts[0])
+            await message.reply(content=parts[0], msg_seq=1)
             return
 
         for idx, part in enumerate(parts):
@@ -581,7 +585,11 @@ class AIBotClient(botpy.Client):
             if idx:
                 delay += random.uniform(0.2, 0.6)
             await asyncio.sleep(delay)
-            await message.reply(content=part)
+            try:
+                await message.reply(content=part, msg_seq=idx + 1)
+            except Exception as exc:  # noqa: BLE001 - 分条失败别把整轮回复炸掉
+                botpy.logger.warning(f"分条发送失败（第 {idx + 1} 条）：{exc}")
+                return
 
     def _remember_reply(self, session_id: str, text: str) -> None:
         """记下最近发出去的回复，供引用识别使用。"""
@@ -953,7 +961,7 @@ class AIBotClient(botpy.Client):
             parts = parts[: max_parts - 1] + ["".join(parts[max_parts - 1 :])]
         return parts
 
-    async def _send_voice(self, message, text: str, session_id: str) -> bool:
+    async def _send_voice(self, message, text: str, session_id: str, msg_seq: int = 1) -> bool:
         """合成语音并用官方富媒体接口发成 QQ 语音消息。失败返回 False。"""
         if not (config.ENABLE_TTS and text and text.strip()):
             return False
@@ -987,7 +995,7 @@ class AIBotClient(botpy.Client):
             if not info:
                 botpy.logger.warning(f"语音上传失败：{uploaded}")
                 return False
-            await message.reply(msg_type=7, media={"file_info": info})
+            await message.reply(msg_type=7, media={"file_info": info}, msg_seq=msg_seq)
             botpy.logger.info(f"已发送语音：{voice}，{len(audio)} 字节 -> {text[:20]}…")
             return True
         except Exception as exc:  # noqa: BLE001 - 单条失败不影响文字兜底
@@ -1089,7 +1097,7 @@ class AIBotClient(botpy.Client):
                     await asyncio.sleep(
                         random.uniform(config.HUMAN_DELAY_MIN, config.HUMAN_DELAY_MAX) + 0.3
                     )
-                if not await self._send_voice(message, part, session_id):
+                if not await self._send_voice(message, part, session_id, msg_seq=idx + 1):
                     break
                 sent += 1
             if sent:
