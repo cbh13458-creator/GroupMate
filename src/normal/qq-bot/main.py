@@ -542,10 +542,9 @@ class AIBotClient(botpy.Client):
         单独一屏的怪现象。
         """
         text = (text or "").strip()
-        if not config.HUMAN_MODE or not text:
-            return [text] if text else []
-        # 有换行说明模型自己分了段，直接按段发；没有换行时太短就不拆
-        if "\n" not in text and len(text) < config.HUMAN_SPLIT_MIN_LEN:
+        if not text:
+            return []
+        if not config.HUMAN_MODE:
             return [text]
 
         # 先按换行分段，再按中文句末标点细分
@@ -570,6 +569,9 @@ class AIBotClient(botpy.Client):
         parts = self._split_human(text)
         if not parts:
             return
+        botpy.logger.info(
+            f"人味模式：HUMAN_MODE={config.HUMAN_MODE} 原文 {len(text)} 字 -> {len(parts)} 条"
+        )
         if len(parts) == 1:
             await message.reply(content=parts[0])
             return
