@@ -16,9 +16,21 @@ AI_MODEL = os.getenv("AI_MODEL", "glm-4.7-flash")
 AI_FALLBACK_MODEL = os.getenv("AI_FALLBACK_MODEL", "")
 # 视觉模型（识别图片/表情包，免费）
 AI_VISION_MODEL = os.getenv("AI_VISION_MODEL", "glm-4.6v-flash")
-AI_SYSTEM_PROMPT = os.getenv("AI_SYSTEM_PROMPT", "你是一个真人朋友，在 QQ 上和用户闲聊，不是 AI 助手、词典或百科。铁规矩：绝不解释词语含义、不下定义、不说“XX是指”这类百科式的话；用户说什么，你就像朋友一样接话——表达感受、顺着聊、反问、开玩笑、吐槽都行。回复要像真人发消息，一两句为主，口语化，别长篇大论、别用“首先/其次/最后”。用户只发一两个词时，别当题目去解答，先接住话往下聊。例：用户说“朋友”，别解释朋友是什么，回“哈哈怎么突然聊这个，想谁啦”；用户说“今天好累”，回“咋啦，干啥了这么累”。")
+AI_SYSTEM_PROMPT = os.getenv("AI_SYSTEM_PROMPT", "你是一个真人朋友，在 QQ 上和用户闲聊，不是 AI 助手、词典或百科。铁规矩：绝不解释词语含义、不下定义、不说“XX是指”这类百科式的话；用户说什么，你就像朋友一样接话——表达感受、顺着聊、反问、开玩笑、吐槽都行。回复要像真人发消息，一两句为主，口语化，别长篇大论、别用“首先/其次/最后”，不要用列表、编号、加粗或任何 Markdown 格式。用户只发一两个词时，别当题目去解答，先接住话往下聊。例：用户说“朋友”，别解释朋友是什么，回“哈哈怎么突然聊这个，想谁啦”；用户说“今天好累”，回“咋啦，干啥了这么累”。")
 AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "2048"))
 AI_TEMPERATURE = float(os.getenv("AI_TEMPERATURE", "0.7"))
+
+# ============ 人味模式 ============
+# 长回复拆成 2~3 条短消息、带随机“打字”延迟发出去，像真人一条条敲；
+# 关掉则和以前一样整段一次性发出。
+HUMAN_MODE = os.getenv("HUMAN_MODE", "true").lower() in ("1", "true", "yes", "on")
+# 最多拆成几条（QQ 被动回复有次数上限，别设太大）
+HUMAN_SPLIT_MAX = int(os.getenv("HUMAN_SPLIT_MAX", "3"))
+# 超过多少字才拆（太短就一条发完，避免“嗯”“啊”也拆）
+HUMAN_SPLIT_MIN_LEN = int(os.getenv("HUMAN_SPLIT_MIN_LEN", "28"))
+# 每条消息发出前的随机延迟区间（秒），模拟看消息 + 打字的停顿
+HUMAN_DELAY_MIN = float(os.getenv("HUMAN_DELAY_MIN", "0.4"))
+HUMAN_DELAY_MAX = float(os.getenv("HUMAN_DELAY_MAX", "1.2"))
 
 # 联网搜索（默认开启）
 AI_WEB_SEARCH = os.getenv("AI_WEB_SEARCH", "true").lower() in ("1", "true", "yes", "on")

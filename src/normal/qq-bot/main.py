@@ -535,6 +535,52 @@ class AIBotClient(botpy.Client):
     def _norm_text(text: str) -> str:
         return re.sub(r"\s+", "", text or "")
 
+    def _split_human(self, text: str) -> list[str]:
+        """把长回复切成 1~HUMAN_SPLIT_MAX 条短消息，模仿真人分条发。
+
+        优先按换行切，其次按句末标点切；每条不会太短，避免出现「嗯」「啊」
+        单独一屏的怪现象。
+        """
+        text = (text or "").strip()
+        if not config.HUMAN_MODE or not text:
+            return [text] if text else []
+        # 有换行说明模型自己分了段，直接按段发；没有换行时太短就不拆
+        if "\n" not in text and len(text) < config.HUMAN_SPLIT_MIN_LEN:
+            return [text]
+
+        # 先按换行分段，再按中文句末标点细分
+        chunks: list[str] = []
+        for line in text.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            parts = re.split(r"(?<=[。！？!?…~～])", line)
+            chunks.extend(p.strip() for p in parts if p.strip())
+        if len(chunks) <= 1:
+            return [text]
+
+        max_parts = max(1, config.HUMAN_SPLIT_MAX)
+        # 段数超过上限时把尾巴合并到前一段，避免刷屏
+        if len(chunks) > max_parts:
+            chunks = chunks[: max_parts - 1] + ["\n".join(chunks[max_parts - 1 :])]
+        return chunks
+
+    async def _human_send(self, message, text: str) -> None:
+        """按人味模式发出回复：分条 + 随机延迟。失败退回单条发送。"""
+        parts = self._split_human(text)
+        if not parts:
+            return
+        if len(parts) == 1:
+            await message.reply(content=parts[0])
+            return
+
+        for idx, part in enumerate(parts):
+            delay = random.uniform(config.HUMAN_DELAY_MIN, config.HUMAN_DELAY_MAX)
+            if idx:
+                delay += random.uniform(0.2, 0.6)
+            await asyncio.sleep(delay)
+            await message.reply(content=part)
+
     def _remember_reply(self, session_id: str, text: str) -> None:
         """记下最近发出去的回复，供引用识别使用。"""
         if not session_id or not text:
@@ -999,7 +1045,7 @@ class AIBotClient(botpy.Client):
             self._remember_reply(session_id, reply_text)
             return
 
-        await message.reply(content=reply_text)
+        await self._human_send(message, reply_text)
         self._remember_reply(session_id, reply_text)
 
     async def on_group_at_message_create(self, message: GroupMessage):
